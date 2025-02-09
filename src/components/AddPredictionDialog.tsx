@@ -1,0 +1,129 @@
+'use client'
+
+import { useState } from 'react'
+import { supabase } from '../lib/supabase/client'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from './ui/dialog'
+import { Button } from './ui/button'
+import { Textarea } from './ui/textarea'
+import { useToast } from './ui/use-toast'
+import { useAuth } from '../lib/supabase/auth-context'
+
+type Prediction = {
+  id: string
+  content: string
+  user_id: string
+  is_locked: boolean
+  created_at: string
+  updated_at: string
+  user: {
+    user_metadata: {
+      display_name: string
+    }
+  }
+}
+
+interface AddPredictionDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  setPredictions: React.Dispatch<React.SetStateAction<Prediction[]>>
+}
+
+export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddPredictionDialogProps) {
+  const [content, setContent] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
+  const { user } = useAuth()
+
+  const handleSubmit = async () => {
+    if (!user || !content.trim()) return
+
+    // Fetch current display name
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .single()
+
+    // Create optimistic prediction with actual display name
+    const optimisticPrediction: Prediction = {
+      id: crypto.randomUUID(),
+      content: content.trim(),
+      user_id: user.id,
+      is_locked: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user: {
+        user_metadata: {
+          display_name: profile?.display_name || 'Anonymous'
+        }
+      }
+    }
+
+    // Add to list immediately
+    setPredictions(prev => [optimisticPrediction, ...prev])
+    
+    setIsSubmitting(true)
+    try {
+      const { error } = await supabase
+        .from('predictions')
+        .insert([
+          {
+            content: content.trim(),
+            user_id: user.id,
+          },
+        ])
+        .select()
+
+      if (error) throw error
+
+      setContent('')
+      onOpenChange(false)
+      toast({
+        title: 'Success',
+        description: 'Your prediction has been added.',
+      })
+    } catch (error: any) {
+      // Remove optimistic prediction on error
+      setPredictions(prev => prev.filter(p => p.id !== optimisticPrediction.id))
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add New Prediction</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <Textarea
+            placeholder="Enter your prediction..."
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="min-h-[100px]"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting || !content.trim()}>
+            {isSubmitting ? 'Adding...' : 'Add Prediction'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+} 
