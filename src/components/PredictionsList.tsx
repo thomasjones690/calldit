@@ -22,6 +22,7 @@ import { AddPredictionDialog } from './AddPredictionDialog'
 import { AddResultDialog } from './AddResultDialog'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
+import { LoginDialog } from './LoginDialog'
 
 type Prediction = {
   id: string
@@ -53,6 +54,7 @@ export function PredictionsList() {
   const [addingResultTo, setAddingResultTo] = useState<Prediction | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
+  const [isLoginOpen, setIsLoginOpen] = useState(false)
 
   useEffect(() => {
     console.log('Component mounted, fetching initial data...')
@@ -336,10 +338,16 @@ export function PredictionsList() {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold">Predictions</h2>
-          <Button onClick={() => setIsAddingPrediction(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Prediction
-          </Button>
+          {user ? (
+            <Button onClick={() => setIsAddingPrediction(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Prediction
+            </Button>
+          ) : (
+            <Button onClick={() => setIsLoginOpen(true)}>
+              Sign in to add predictions
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -503,6 +511,11 @@ export function PredictionsList() {
           onSave={handleSaveExplanation}
         />
       )}
+
+      <LoginDialog
+        open={isLoginOpen}
+        onOpenChange={setIsLoginOpen}
+      />
     </>
   )
 } 

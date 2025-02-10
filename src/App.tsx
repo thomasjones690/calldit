@@ -1,12 +1,11 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './lib/supabase/auth-context'
-import { AuthComponent } from './components/Auth'
 import { Header } from './components/Header'
-import PredictionsPage from './pages/predictions'
 import { Toaster } from './components/ui/toaster'
 import { useAuth } from './lib/supabase/auth-context'
 import { DisplayNamePrompt } from './components/DisplayNamePrompt'
 import { Helmet, HelmetProvider } from 'react-helmet-async'
+import { PredictionsList } from './components/PredictionsList'
 
 // Protected Route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -35,17 +34,9 @@ function App() {
               <link rel="icon" href="/favicon.ico" />
             </Helmet>
             <Header />
-            <main className="flex-1">
+            <main className="flex-1 container mx-auto px-4 py-8">
               <Routes>
-                <Route path="/" element={<AuthComponent />} />
-                <Route 
-                  path="/predictions" 
-                  element={
-                    <ProtectedRoute>
-                      <PredictionsPage />
-                    </ProtectedRoute>
-                  } 
-                />
+                <Route path="/" element={<PredictionsList />} />
               </Routes>
             </main>
             <DisplayNamePrompt />
