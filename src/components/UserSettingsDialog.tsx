@@ -15,6 +15,7 @@ import { Label } from './ui/label'
 import { Input } from './ui/input'
 import { Button } from './ui/button'
 import { useToast } from './ui/use-toast'
+import { LogOut } from 'lucide-react'
 
 interface UserSettingsDialogProps {
   open?: boolean
@@ -92,6 +93,19 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
     }
   }
 
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      toast({
+        title: 'Error signing out',
+        description: error.message,
+        variant: 'destructive',
+      })
+    } else {
+      onOpenChange?.(false)
+    }
+  }
+
   return (
     <Dialog modal open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -152,6 +166,18 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
               <span className="text-muted-foreground">Locked Predictions:</span>
               <span>Coming soon</span>
             </div>
+          </div>
+
+          {/* Add Sign Out Button */}
+          <div className="border-t pt-4">
+            <Button 
+              variant="destructive" 
+              onClick={handleSignOut}
+              className="w-full"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
+            </Button>
           </div>
         </div>
       </DialogContent>

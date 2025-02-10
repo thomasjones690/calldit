@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/supabase/auth-context'
 import { Button } from './ui/button'
 import { UserSettingsDialog } from './UserSettingsDialog'
-import { Settings, LogOut } from 'lucide-react'
+import { User } from 'lucide-react'
 import { supabase } from '../lib/supabase/client'
 import { PredictionStats } from './PredictionStats'
 import { LoginDialog } from './LoginDialog'
@@ -16,6 +16,25 @@ export function Header() {
   const location = useLocation()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isLoginOpen, setIsLoginOpen] = useState(false)
+  const [profile, setProfile] = useState<{ display_name: string } | null>(null)
+
+  useEffect(() => {
+    if (user) {
+      const fetchProfile = async () => {
+        const { data } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', user.id)
+          .single()
+        
+        if (data) {
+          setProfile(data)
+        }
+      }
+      
+      fetchProfile()
+    }
+  }, [user])
 
   useEffect(() => {
     if (user) {
@@ -40,17 +59,17 @@ export function Header() {
                 onClick={() => setIsSettingsOpen(true)}
                 className="flex items-center gap-2"
               >
-                <Settings className="h-4 w-4" />
-                Settings
+                <User className="h-4 w-4" />
+                {profile?.display_name || 'Profile'}
               </Button>
-              <Button 
+              {/* <Button 
                 variant="outline" 
                 onClick={handleSignOut}
                 className="flex items-center gap-2"
               >
                 <LogOut className="h-4 w-4" />
                 Sign Out
-              </Button>
+              </Button> */}
             </div>
           ) : (
             <Button onClick={() => setIsLoginOpen(true)}>

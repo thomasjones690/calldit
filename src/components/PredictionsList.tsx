@@ -24,6 +24,13 @@ import { CheckCircle2, XCircle } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { LoginDialog } from './LoginDialog'
 import { cn } from '../lib/utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select"
 
 type Prediction = {
   id: string
@@ -524,37 +531,58 @@ export function PredictionsList() {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-          <ToggleGroup 
-            type="single" 
-            value={activeFilter}
-            onValueChange={(value: FilterType) => setActiveFilter(value || 'all')}
-            className="justify-start"
-          >
-            <ToggleGroupItem value="all" aria-label="Show all predictions">
-              All
-            </ToggleGroupItem>
-            {user && (
-              <ToggleGroupItem value="mine" aria-label="Show my predictions">
-                Mine
+        <div className="flex justify-between items-center gap-4">
+          {/* Mobile Filter Dropdown */}
+          <div className="block sm:hidden w-48">
+            <Select
+              value={activeFilter}
+              onValueChange={(value: FilterType) => setActiveFilter(value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {user && <SelectItem value="mine">Mine</SelectItem>}
+                <SelectItem value="awaiting">Awaiting</SelectItem>
+                <SelectItem value="correct">Correct</SelectItem>
+                <SelectItem value="incorrect">Incorrect</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop Toggle Group */}
+          <div className="hidden sm:block">
+            <ToggleGroup 
+              type="single" 
+              value={activeFilter}
+              onValueChange={(value: FilterType) => setActiveFilter(value || 'all')}
+              className="justify-start"
+            >
+              <ToggleGroupItem value="all" aria-label="Show all predictions">
+                All
               </ToggleGroupItem>
-            )}
-            <ToggleGroupItem value="awaiting" aria-label="Show predictions awaiting results">
-              Awaiting
-            </ToggleGroupItem>
-            <ToggleGroupItem value="correct" aria-label="Show correct predictions">
-              Correct
-            </ToggleGroupItem>
-            <ToggleGroupItem value="incorrect" aria-label="Show incorrect predictions">
-              Incorrect
-            </ToggleGroupItem>
-          </ToggleGroup>
+              {user && (
+                <ToggleGroupItem value="mine" aria-label="Show my predictions">
+                  Mine
+                </ToggleGroupItem>
+              )}
+              <ToggleGroupItem value="awaiting" aria-label="Show predictions awaiting results">
+                Awaiting
+              </ToggleGroupItem>
+              <ToggleGroupItem value="correct" aria-label="Show correct predictions">
+                Correct
+              </ToggleGroupItem>
+              <ToggleGroupItem value="incorrect" aria-label="Show incorrect predictions">
+                Incorrect
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
 
           <Button
             variant="outline"
             size="sm"
             onClick={() => setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc')}
-            className="ml-auto"
           >
             <ArrowUpDown className="h-4 w-4 mr-2" />
             {sortDirection === 'desc' ? 'Newest First' : 'Oldest First'}
