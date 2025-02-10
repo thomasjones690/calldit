@@ -23,6 +23,7 @@ import { AddResultDialog } from './AddResultDialog'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { LoginDialog } from './LoginDialog'
+import { cn } from '../lib/utils'
 
 type Prediction = {
   id: string
@@ -55,6 +56,12 @@ export function PredictionsList() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
   const [isLoginOpen, setIsLoginOpen] = useState(false)
+
+  useEffect(() => {
+    if (!user && activeFilter === 'mine') {
+      setActiveFilter('all')
+    }
+  }, [user, activeFilter])
 
   useEffect(() => {
     console.log('Component mounted, fetching initial data...')
@@ -360,9 +367,11 @@ export function PredictionsList() {
             <ToggleGroupItem value="all" aria-label="Show all predictions">
               All
             </ToggleGroupItem>
-            <ToggleGroupItem value="mine" aria-label="Show my predictions">
-              Mine
-            </ToggleGroupItem>
+            {user && (
+              <ToggleGroupItem value="mine" aria-label="Show my predictions">
+                Mine
+              </ToggleGroupItem>
+            )}
             <ToggleGroupItem value="awaiting" aria-label="Show predictions awaiting results">
               Awaiting
             </ToggleGroupItem>
@@ -396,7 +405,16 @@ export function PredictionsList() {
         ) : (
           <div className="space-y-4">
             {getFilteredPredictions().map((prediction) => (
-              <Card key={prediction.id} className="p-4">
+              <Card 
+                key={prediction.id} 
+                className={cn(
+                  "p-4 rounded-lg border", 
+                  {
+                    "bg-green-100 dark:bg-green-950": prediction.is_correct === true,
+                    "bg-red-100 dark:bg-red-950": prediction.is_correct === false,
+                  }
+                )}
+              >
                 <div className="flex justify-between items-start">
                   <div className="space-y-2">
                     <p className="text-lg">{prediction.content}</p>
