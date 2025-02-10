@@ -673,27 +673,27 @@ export function PredictionsList() {
                     </Button>
                   )}
                   {user && user.id !== prediction.user_id && prediction.result_text === null && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-sm text-muted-foreground">
-                        {voteCounts[prediction.id]?.agrees || 0}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant={votes[prediction.id]?.type === 'agree' ? 'default' : 'outline'}
-                        onClick={() => handleVote(prediction.id, 'agree')}
-                      >
-                        <ThumbsUp className="w-4 h-4 mr-1" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={votes[prediction.id]?.type === 'disagree' ? 'default' : 'outline'}
-                        onClick={() => handleVote(prediction.id, 'disagree')}
-                      >
-                        <ThumbsDown className="w-4 h-4 mr-1" />
-                      </Button>
-                      <span className="text-sm text-muted-foreground">
-                        {voteCounts[prediction.id]?.disagrees || 0}
-                      </span>
+                    <div className="mt-auto">
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          size="sm"
+                          variant={votes[prediction.id]?.type === 'agree' ? 'default' : 'outline'}
+                          onClick={() => handleVote(prediction.id, 'agree')}
+                          className="w-full"
+                        >
+                          <ThumbsUp className="w-4 h-4 mr-1" />
+                          <span className="ml-1">{voteCounts[prediction.id]?.agrees || 0}</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={votes[prediction.id]?.type === 'disagree' ? 'default' : 'outline'}
+                          onClick={() => handleVote(prediction.id, 'disagree')}
+                          className="w-full"
+                        >
+                          <ThumbsDown className="w-4 h-4 mr-1" />
+                          <span className="ml-1">{voteCounts[prediction.id]?.disagrees || 0}</span>
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
