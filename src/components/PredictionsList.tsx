@@ -469,6 +469,7 @@ export function PredictionsList() {
           open={!!editingPrediction}
           onOpenChange={(open) => !open && setEditingPrediction(null)}
           prediction={editingPrediction}
+          setPredictions={setPredictions}
         />
       )}
 

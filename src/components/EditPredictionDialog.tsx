@@ -12,44 +12,59 @@ import {
 import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
 import { useToast } from './ui/use-toast'
+import { Prediction } from '../types'
 
 interface EditPredictionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  prediction: {
-    id: string
-    content: string
-  }
+  prediction: Prediction
+  setPredictions: React.Dispatch<React.SetStateAction<Prediction[]>>
 }
 
-export function EditPredictionDialog({ open, onOpenChange, prediction }: EditPredictionDialogProps) {
+export function EditPredictionDialog({ open, onOpenChange, prediction, setPredictions }: EditPredictionDialogProps) {
   const [content, setContent] = useState(prediction.content)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 
   const handleUpdate = async () => {
+    if (!content.trim()) return
+
+    // Optimistically update the prediction
+    setPredictions(prev => prev.map(p => 
+      p.id === prediction.id 
+        ? { ...p, content: content.trim(), updated_at: new Date().toISOString() }
+        : p
+    ))
+
     setIsSubmitting(true)
-    const { error } = await supabase
-      .from('predictions')
-      .update({ content })
-      .eq('id', prediction.id)
+    try {
+      const { error } = await supabase
+        .from('predictions')
+        .update({ content: content.trim() })
+        .eq('id', prediction.id)
 
-    setIsSubmitting(false)
+      if (error) throw error
 
-    if (error) {
+      toast({
+        title: 'Success',
+        description: 'Prediction updated successfully.',
+      })
+      onOpenChange(false)
+    } catch (error: any) {
+      // Revert optimistic update
+      setPredictions(prev => prev.map(p => 
+        p.id === prediction.id 
+          ? { ...p, content: prediction.content }
+          : p
+      ))
       toast({
         title: 'Error updating prediction',
         description: error.message,
         variant: 'destructive',
       })
-      return
+    } finally {
+      setIsSubmitting(false)
     }
-
-    toast({
-      title: 'Prediction updated',
-      description: 'Your prediction has been updated successfully.',
-    })
-    onOpenChange(false)
   }
 
   return (
