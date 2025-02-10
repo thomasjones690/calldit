@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog'
-import { Edit, Trash2, Lock, Plus, ArrowUpDown } from 'lucide-react'
+import { Edit, Trash2, Lock, Plus, ArrowUpDown, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { AddPredictionDialog } from './AddPredictionDialog'
 import { AddResultDialog } from './AddResultDialog'
 import { CheckCircle2, XCircle } from 'lucide-react'
@@ -44,6 +44,7 @@ type Prediction = {
 
 type SortDirection = 'desc' | 'asc'
 type FilterType = 'all' | 'mine' | 'awaiting' | 'correct' | 'incorrect'
+type VoteCounts = Record<string, { agrees: number, disagrees: number }>
 
 export function PredictionsList() {
   const [predictions, setPredictions] = useState<Prediction[]>([])
@@ -56,6 +57,8 @@ export function PredictionsList() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
   const [isLoginOpen, setIsLoginOpen] = useState(false)
+  const [votes, setVotes] = useState<Record<string, { type: 'agree' | 'disagree', id: string }>>({})
+  const [voteCounts, setVoteCounts] = useState<VoteCounts>({})
 
   useEffect(() => {
     if (!user && activeFilter === 'mine') {
@@ -75,6 +78,52 @@ export function PredictionsList() {
       if (channel) {
         supabase.removeChannel(channel)
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchVotes()
+    
+    const channel = supabase
+      .channel('votes_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'prediction_votes',
+        },
+        () => {
+          fetchVotes()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
+
+  useEffect(() => {
+    fetchVoteCounts()
+    
+    const channel = supabase
+      .channel('vote_counts_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'prediction_votes',
+        },
+        () => {
+          fetchVoteCounts()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
     }
   }, [])
 
@@ -137,6 +186,12 @@ export function PredictionsList() {
   const getFilteredPredictions = () => {
     return predictions
       .filter(prediction => {
+        // First filter out locked predictions that aren't yours
+        if (!prediction.is_locked && prediction.user_id !== user?.id) {
+          return false
+        }
+
+        // Then apply the selected filter
         switch (activeFilter) {
           case 'mine':
             return prediction.user_id === user?.id
@@ -218,6 +273,118 @@ export function PredictionsList() {
         title: 'Error fetching predictions',
         description: error.message,
         variant: 'destructive',
+      })
+    }
+  }
+
+  const fetchVotes = async () => {
+    if (!user) return
+    const { data, error } = await supabase
+      .from('prediction_votes')
+      .select('*')
+      .eq('user_id', user.id)
+
+    if (error) {
+      console.error('Error fetching votes:', error)
+      return
+    }
+
+    const votesMap = data.reduce((acc, vote) => ({
+      ...acc,
+      [vote.prediction_id]: { type: vote.vote_type, id: vote.id }
+    }), {})
+    setVotes(votesMap)
+  }
+
+  const fetchVoteCounts = async () => {
+    const { data, error } = await supabase
+      .from('prediction_votes')
+      .select('prediction_id, vote_type')
+
+    if (error) {
+      console.error('Error fetching vote counts:', error)
+      return
+    }
+
+    const counts = data.reduce((acc, vote) => {
+      if (!acc[vote.prediction_id]) {
+        acc[vote.prediction_id] = { agrees: 0, disagrees: 0 }
+      }
+      if (vote.vote_type === 'agree') {
+        acc[vote.prediction_id].agrees++
+      } else {
+        acc[vote.prediction_id].disagrees++
+      }
+      return acc
+    }, {} as VoteCounts)
+
+    setVoteCounts(counts)
+  }
+
+  const handleVote = async (predictionId: string, voteType: 'agree' | 'disagree') => {
+    if (!user) return
+    
+    const existingVote = votes[predictionId]
+    const previousVotes = { ...votes }
+    
+    try {
+      if (existingVote) {
+        // Optimistically remove vote if clicking the same button
+        if (existingVote.type === voteType) {
+          // Optimistically update UI
+          const newVotes = { ...votes }
+          delete newVotes[predictionId]
+          setVotes(newVotes)
+
+          // Attempt server update
+          const { error } = await supabase
+            .from('prediction_votes')
+            .delete()
+            .eq('id', existingVote.id)
+
+          if (error) throw error
+        }
+        return // Don't allow changing vote type
+      }
+
+      // Optimistically add new vote
+      setVotes(prev => ({
+        ...prev,
+        [predictionId]: { 
+          type: voteType, 
+          id: 'temp-id' // Temporary ID until server responds
+        }
+      }))
+
+      // Attempt server update
+      const { data, error } = await supabase
+        .from('prediction_votes')
+        .insert({
+          prediction_id: predictionId,
+          user_id: user.id,
+          vote_type: voteType
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // Update with real ID from server
+      setVotes(prev => ({
+        ...prev,
+        [predictionId]: { 
+          type: voteType, 
+          id: data.id 
+        }
+      }))
+
+    } catch (error) {
+      // Revert to previous state on error
+      setVotes(previousVotes)
+      toast({
+        title: "Error",
+        description: "Failed to update vote. Please try again.",
+        variant: "destructive"
       })
     }
   }
@@ -476,6 +643,30 @@ export function PredictionsList() {
                     >
                       Add Result
                     </Button>
+                  )}
+                  {user && user.id !== prediction.user_id && prediction.result_text === null && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-sm text-muted-foreground">
+                        {voteCounts[prediction.id]?.agrees || 0}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant={votes[prediction.id]?.type === 'agree' ? 'default' : 'outline'}
+                        onClick={() => handleVote(prediction.id, 'agree')}
+                      >
+                        <ThumbsUp className="w-4 h-4 mr-1" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={votes[prediction.id]?.type === 'disagree' ? 'default' : 'outline'}
+                        onClick={() => handleVote(prediction.id, 'disagree')}
+                      >
+                        <ThumbsDown className="w-4 h-4 mr-1" />
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        {voteCounts[prediction.id]?.disagrees || 0}
+                      </span>
+                    </div>
                   )}
                 </div>
               </Card>

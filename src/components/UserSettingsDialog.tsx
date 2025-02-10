@@ -21,11 +21,20 @@ interface UserSettingsDialogProps {
   onOpenChange?: (open: boolean) => void
 }
 
+interface Profile {
+  id: string
+  display_name: string
+  total_points: number
+  total_correct: number
+  // ... other profile fields
+}
+
 export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   const [displayName, setDisplayName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [profile, setProfile] = useState<Profile | null>(null)
 
   useEffect(() => {
     if (open && user) {
@@ -42,6 +51,7 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
         }
 
         if (data) {
+          setProfile(data)
           setDisplayName(data.display_name || '')
         }
       }
@@ -129,10 +139,14 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
             </DialogFooter>
           </form>
 
-          {/* Stats Section */}
+          {/* Updated Stats Section */}
           <div className="grid gap-2">
             <h3 className="font-semibold">Your Stats</h3>
             <div className="grid grid-cols-2 gap-1 text-sm">
+              <span className="text-muted-foreground">Total Points:</span>
+              <span>{profile?.total_points || 0}</span>
+              <span className="text-muted-foreground">Correct Predictions:</span>
+              <span>{profile?.total_correct || 0}</span>
               <span className="text-muted-foreground">Total Predictions:</span>
               <span>Coming soon</span>
               <span className="text-muted-foreground">Locked Predictions:</span>
