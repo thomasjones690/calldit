@@ -87,7 +87,7 @@ export function PredictionCard({ prediction, voteCounts, onAddResult, isOwner, o
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {!prediction.result_text && isOwner && (
+            {!prediction.result_text && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
