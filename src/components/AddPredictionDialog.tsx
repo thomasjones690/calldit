@@ -15,20 +15,7 @@ import { useToast } from './ui/use-toast'
 import { useAuth } from '../lib/supabase/auth-context'
 import { CategorySelect } from './CategorySelect'
 import { Label } from './ui/label'
-
-type Prediction = {
-  id: string
-  content: string
-  user_id: string
-  is_locked: boolean
-  created_at: string
-  updated_at: string
-  user: {
-    user_metadata: {
-      display_name: string
-    }
-  }
-}
+import { Prediction } from '@/types'  // Use absolute import
 
 interface AddPredictionDialogProps {
   open: boolean
@@ -59,6 +46,7 @@ export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddP
       content: content.trim(),
       user_id: user.id,
       is_locked: false,
+      locked_at: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       user: {

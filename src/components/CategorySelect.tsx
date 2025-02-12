@@ -1,94 +1,57 @@
-'use client'
-
+import * as React from 'react'
 import { useState, useEffect } from 'react'
-import Select from 'react-select'
+import { StyledSelect } from './StyledSelect'
 import { supabase } from '@/lib/supabase/client'
-import * as icons from 'lucide-react'
-
-interface Category {
-  id: string
-  name: string
-  icon?: string
-}
-
-interface CategoryOption {
-  value: string
-  label: string
-  icon?: string
-}
+import { AVAILABLE_ICONS } from './CategoryManagement'
 
 interface CategorySelectProps {
-  value?: string
+  value: string
   onChange: (value: string) => void
 }
 
 export function CategorySelect({ value, onChange }: CategorySelectProps) {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [options, setOptions] = useState<CategoryOption[]>([])
+  const [categories, setCategories] = useState<any[]>([])
 
   useEffect(() => {
     fetchCategories()
   }, [])
 
   const fetchCategories = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('categories')
-      .select('*')
+      .select('id, name, icon')
       .order('name')
     
-    if (data) {
+    if (!error && data) {
       setCategories(data)
-      setOptions(data.map(category => ({
-        value: category.id,
-        label: category.name,
-        icon: category.icon
-      })))
     }
   }
 
-  const IconComponent = ({ iconName }: { iconName: string }) => {
-    const Icon = (icons as any)[iconName]
-    return Icon ? <Icon className="h-4 w-4" /> : null
-  }
+  const options = categories.map(category => ({
+    value: category.id,
+    label: category.name,
+    icon: category.icon && AVAILABLE_ICONS[category.icon as keyof typeof AVAILABLE_ICONS] 
+      ? React.createElement(AVAILABLE_ICONS[category.icon as keyof typeof AVAILABLE_ICONS], { 
+          className: "h-4 w-4 mr-2" 
+        })
+      : null
+  }))
 
-  const customStyles = {
-    control: (base: any) => ({
-      ...base,
-      backgroundColor: 'hsl(var(--background))',
-      borderColor: 'hsl(var(--border))',
-      '&:hover': {
-        borderColor: 'hsl(var(--border))'
-      }
-    }),
-    menu: (base: any) => ({
-      ...base,
-      backgroundColor: 'hsl(var(--background))',
-      borderColor: 'hsl(var(--border))'
-    }),
-    option: (base: any, state: any) => ({
-      ...base,
-      backgroundColor: state.isFocused 
-        ? 'hsl(var(--accent))' 
-        : 'hsl(var(--background))',
-      color: 'hsl(var(--foreground))',
-      '&:hover': {
-        backgroundColor: 'hsl(var(--accent))'
-      }
-    })
-  }
+  const formatOptionLabel = ({ label, icon }: any) => (
+    <div className="flex items-center">
+      {icon}
+      {label}
+    </div>
+  )
 
   return (
-    <Select
-      options={options}
+    <StyledSelect
       value={options.find(option => option.value === value)}
-      onChange={(newValue) => onChange(newValue?.value || '')}
-      styles={customStyles}
-      formatOptionLabel={(option: CategoryOption) => (
-        <div className="flex items-center gap-2">
-          {option.icon && <IconComponent iconName={option.icon} />}
-          <span>{option.label}</span>
-        </div>
-      )}
+      onChange={(option: any) => onChange(option?.value || '')}
+      options={options}
+      formatOptionLabel={formatOptionLabel}
+      isClearable
+      placeholder="Select a category..."
     />
   )
 }

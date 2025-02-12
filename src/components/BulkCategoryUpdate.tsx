@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Button } from './ui/button'
 import { CategorySelect } from './CategorySelect'
 import { Card } from './ui/card'
 import { toast } from './ui/use-toast'
@@ -64,6 +63,7 @@ export function BulkCategoryUpdate() {
           <div className="flex gap-2">
             <div className="flex-1">
               <CategorySelect
+                value={prediction.category_id}
                 onChange={(categoryId) => updateCategory(prediction.id, categoryId)}
               />
             </div>

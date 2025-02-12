@@ -10,6 +10,7 @@ import {
 } from "./ui/tooltip"
 import React from 'react'
 import { AVAILABLE_ICONS } from './CategoryManagement'  // Import the icons map
+import { format } from 'timeago.js'
 
 interface PredictionCardProps {
   prediction: {
@@ -28,6 +29,7 @@ interface PredictionCardProps {
       name: string
       icon?: string
     }
+    locked_at?: string | null
   }
   voteCounts: {
     agrees: number
@@ -40,13 +42,22 @@ interface PredictionCardProps {
 }
 
 export function PredictionCard({ prediction, voteCounts, onAddResult, isOwner, onVote, votes }: PredictionCardProps) {
+  const getCardClassName = () => {
+    if (prediction.result_text) {
+      return prediction.is_correct
+        ? "p-4 border-green-500 bg-green-50 dark:bg-green-950/20"
+        : "p-4 border-red-500 bg-red-50 dark:bg-red-950/20"
+    }
+    return "p-4"
+  }
+
   console.log('Prediction data:', {
     category: prediction.category,
     category_name: prediction.category_name
   });
 
   return (
-    <Card className="p-4">
+    <Card className={getCardClassName()}>
       <div className="flex flex-col gap-2">
         {/* Category and Actions Row */}
         <div className="flex items-center justify-between">
@@ -70,10 +81,13 @@ export function PredictionCard({ prediction, voteCounts, onAddResult, isOwner, o
             </span>
             <span className="text-sm text-muted-foreground">
               As predicted by {isOwner ? 'Me' : prediction.display_name}
+              {prediction.locked_at && (
+                <span className="ml-1">• {format(prediction.locked_at)}</span>
+              )}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {!prediction.result_text && (
+            {!prediction.result_text && isOwner && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -106,6 +120,17 @@ export function PredictionCard({ prediction, voteCounts, onAddResult, isOwner, o
 
         {/* Prediction Content */}
         <h3 className="text-lg font-medium">{prediction.content}</h3>
+
+        {/* Result if available */}
+        {prediction.result_text && (
+          <div className={`text-sm p-2 rounded-md ${
+            prediction.is_correct 
+              ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200' 
+              : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+          }`}>
+            <p>Result: {prediction.result_text}</p>
+          </div>
+        )}
 
         {/* Vote Counts */}
         <div className="flex items-center gap-4 text-sm text-muted-foreground">

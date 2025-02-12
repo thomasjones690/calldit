@@ -19,7 +19,7 @@ import {
 import { Plus, ArrowUpDown} from 'lucide-react'
 import { AddPredictionDialog } from './AddPredictionDialog'
 import { AddResultDialog } from './AddResultDialog'
-import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
+import { CategorySelect } from './CategorySelect'
 import { LoginDialog } from './LoginDialog'
 import {
   Select,
@@ -29,31 +29,7 @@ import {
   SelectValue,
 } from "./ui/select"
 import { PredictionCard } from './PredictionCard'
-
-type Prediction = {
-  id: string
-  content: string
-  user_id: string
-  is_locked: boolean
-  created_at: string
-  updated_at: string
-  result_text?: string
-  is_correct?: boolean
-  result_added_at?: string
-  user: {
-    user_metadata: {
-      display_name: string
-    }
-  }
-  category?: string
-  category_name: string
-  display_name?: string
-  categories?: {
-    id: string
-    name: string
-    icon?: string
-  }
-}
+import { Prediction } from '@/types'
 
 type SortDirection = 'desc' | 'asc'
 type FilterType = 'all' | 'mine' | 'awaiting' | 'correct' | 'incorrect'
@@ -72,6 +48,8 @@ export function PredictionsList() {
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [votes, setVotes] = useState<Record<string, { type: 'agree' | 'disagree', id: string }>>({})
   const [voteCounts, setVoteCounts] = useState<VoteCounts>({})
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [categories, setCategories] = useState<any[]>([])
 
   useEffect(() => {
     if (!user && activeFilter === 'mine') {
@@ -138,6 +116,10 @@ export function PredictionsList() {
     return () => {
       supabase.removeChannel(channel)
     }
+  }, [])
+
+  useEffect(() => {
+    fetchCategories()
   }, [])
 
   const setupRealtimeSubscription = () => {
@@ -250,6 +232,7 @@ export function PredictionsList() {
           content,
           user_id,
           is_locked,
+          locked_at,
           result_text,
           is_correct,
           display_name,
@@ -521,6 +504,33 @@ export function PredictionsList() {
     }
   }
 
+  const fetchCategories = async () => {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, name, icon')
+      .order('name')
+    
+    if (!error && data) {
+      setCategories(data)
+    }
+  }
+
+  const filterPredictions = (predictions: Prediction[]) => {
+    return predictions.filter(prediction => {
+      const matchesFilter = activeFilter === 'all' ||
+        (activeFilter === 'mine' && prediction.user_id === user?.id) ||
+        (activeFilter === 'awaiting' && !prediction.result_text) ||
+        (activeFilter === 'correct' && prediction.is_correct === true) ||
+        (activeFilter === 'incorrect' && prediction.is_correct === false)
+
+      const matchesCategory = !selectedCategory || 
+        selectedCategory === 'all' || 
+        prediction.category_id === selectedCategory
+
+      return matchesFilter && matchesCategory
+    })
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
@@ -537,64 +547,30 @@ export function PredictionsList() {
         )}
       </div>
 
-      <div className="flex justify-between items-center gap-4">
-        <div className="block sm:hidden w-48">
-          <Select
-            value={activeFilter}
-            onValueChange={(value: FilterType) => setActiveFilter(value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              {user && <SelectItem value="mine">Mine</SelectItem>}
-              <SelectItem value="awaiting">Awaiting</SelectItem>
-              <SelectItem value="correct">Correct</SelectItem>
-              <SelectItem value="incorrect">Incorrect</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Select value={activeFilter} onValueChange={(value: FilterType) => setActiveFilter(value)}>
+          <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectValue placeholder="Filter predictions" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Predictions</SelectItem>
+            <SelectItem value="mine">My Predictions</SelectItem>
+            <SelectItem value="awaiting">Awaiting Result</SelectItem>
+            <SelectItem value="correct">Correct</SelectItem>
+            <SelectItem value="incorrect">Incorrect</SelectItem>
+          </SelectContent>
+        </Select>
 
-        <div className="hidden sm:block">
-          <ToggleGroup 
-            type="single" 
-            value={activeFilter}
-            onValueChange={(value: FilterType) => setActiveFilter(value || 'all')}
-            className="justify-start"
-          >
-            <ToggleGroupItem value="all" aria-label="Show all predictions">
-              All
-            </ToggleGroupItem>
-            {user && (
-              <ToggleGroupItem value="mine" aria-label="Show my predictions">
-                Mine
-              </ToggleGroupItem>
-            )}
-            <ToggleGroupItem value="awaiting" aria-label="Show predictions awaiting results">
-              Awaiting
-            </ToggleGroupItem>
-            <ToggleGroupItem value="correct" aria-label="Show correct predictions">
-              Correct
-            </ToggleGroupItem>
-            <ToggleGroupItem value="incorrect" aria-label="Show incorrect predictions">
-              Incorrect
-            </ToggleGroupItem>
-          </ToggleGroup>
+        <div className="w-full sm:w-[200px]">
+          <CategorySelect
+            value={selectedCategory}
+            onChange={setSelectedCategory}
+          />
         </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc')}
-        >
-          <ArrowUpDown className="h-4 w-4 mr-2" />
-          {sortDirection === 'desc' ? 'Newest First' : 'Oldest First'}
-        </Button>
       </div>
 
       <div className="space-y-4">
-        {getFilteredPredictions().map((prediction) => (
+        {filterPredictions(getFilteredPredictions()).map((prediction) => (
           <PredictionCard
             key={prediction.id}
             prediction={prediction}
