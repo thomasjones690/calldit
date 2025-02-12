@@ -13,6 +13,8 @@ import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
 import { useToast } from './ui/use-toast'
 import { useAuth } from '../lib/supabase/auth-context'
+import { CategorySelect } from './CategorySelect'
+import { Label } from './ui/label'
 
 type Prediction = {
   id: string
@@ -36,6 +38,7 @@ interface AddPredictionDialogProps {
 
 export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddPredictionDialogProps) {
   const [content, setContent] = useState('')
+  const [categoryId, setCategoryId] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const { user } = useAuth()
@@ -62,7 +65,9 @@ export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddP
         user_metadata: {
           display_name: profile?.display_name || 'Anonymous'
         }
-      }
+      },
+      category_id: categoryId,
+      category_name: '', // Will be updated by realtime subscription
     }
 
     // Add to list immediately
@@ -72,12 +77,11 @@ export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddP
     try {
       const { error } = await supabase
         .from('predictions')
-        .insert([
-          {
-            content: content.trim(),
-            user_id: user.id,
-          },
-        ])
+        .insert([{
+          content: content.trim(),
+          user_id: user.id,
+          category_id: categoryId || null,
+        }])
         .select()
 
       if (error) throw error
@@ -107,7 +111,14 @@ export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddP
         <DialogHeader>
           <DialogTitle>Add New Prediction</DialogTitle>
         </DialogHeader>
-        <div className="py-4">
+        <div className="py-4 grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="category">Category</Label>
+            <CategorySelect
+              value={categoryId}
+              onChange={setCategoryId}
+            />
+          </div>
           <Textarea
             placeholder="Enter your prediction..."
             value={content}

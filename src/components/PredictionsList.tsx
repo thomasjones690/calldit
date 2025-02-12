@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase/client'
 import { Button } from './ui/button'
 import { useToast } from './ui/use-toast'
-import { Card } from './ui/card'
 import { useAuth } from '../lib/supabase/auth-context'
 import { EditPredictionDialog } from './EditPredictionDialog'
 import {
@@ -17,13 +16,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog'
-import { Edit, Trash2, Lock, Plus, ArrowUpDown, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Plus, ArrowUpDown} from 'lucide-react'
 import { AddPredictionDialog } from './AddPredictionDialog'
 import { AddResultDialog } from './AddResultDialog'
-import { CheckCircle2, XCircle } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { LoginDialog } from './LoginDialog'
-import { cn } from '../lib/utils'
 import {
   Select,
   SelectContent,
@@ -31,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select"
+import { PredictionCard } from './PredictionCard'
 
 type Prediction = {
   id: string
@@ -46,6 +44,14 @@ type Prediction = {
     user_metadata: {
       display_name: string
     }
+  }
+  category?: string
+  category_name: string
+  display_name?: string
+  categories?: {
+    id: string
+    name: string
+    icon?: string
   }
 }
 
@@ -237,40 +243,41 @@ export function PredictionsList() {
       }
 
       // Now try the full query with joins
-      const { data, error } = await supabase
+      const { data: predictions } = await supabase
         .from('predictions_with_profiles')
         .select(`
           id,
           content,
           user_id,
           is_locked,
-          created_at,
-          updated_at,
           result_text,
           is_correct,
-          result_added_at,
-          display_name
+          display_name,
+          category_id,
+          category_name,
+          categories (
+            id,
+            name,
+            icon
+          )
         `)
         .order('created_at', { ascending: sortDirection === 'asc' })
 
-      console.log('Full query result:', { data, error })
+      console.log('Full query result:', { data: predictions, error: null })
 
-      if (error) {
-        console.error('Full query failed:', error)
-        throw error
+      if (!predictions) {
+        throw new Error('Failed to fetch predictions')
       }
 
-      const transformedData = data?.map((prediction: any) => {
-        console.log('Processing prediction:', prediction)
-        return {
-          ...prediction,
-          user: {
+      const transformedData = predictions?.map((prediction: any) => ({
+        ...prediction,
+        category: prediction.category_name,
+        user: {
           user_metadata: {
             display_name: prediction.display_name || 'Anonymous'
           }
         }
-        }
-      })
+      }))
 
       console.log('Transformed data:', transformedData)
       setPredictions(transformedData || [])
@@ -515,192 +522,89 @@ export function PredictionsList() {
   }
 
   return (
-    <>
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Predictions</h2>
-          {user ? (
-            <Button onClick={() => setIsAddingPrediction(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Prediction
-            </Button>
-          ) : (
-            <Button onClick={() => setIsLoginOpen(true)}>
-              Sign in to add predictions
-            </Button>
-          )}
-        </div>
-
-        <div className="flex justify-between items-center gap-4">
-          {/* Mobile Filter Dropdown */}
-          <div className="block sm:hidden w-48">
-            <Select
-              value={activeFilter}
-              onValueChange={(value: FilterType) => setActiveFilter(value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select filter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {user && <SelectItem value="mine">Mine</SelectItem>}
-                <SelectItem value="awaiting">Awaiting</SelectItem>
-                <SelectItem value="correct">Correct</SelectItem>
-                <SelectItem value="incorrect">Incorrect</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Desktop Toggle Group */}
-          <div className="hidden sm:block">
-            <ToggleGroup 
-              type="single" 
-              value={activeFilter}
-              onValueChange={(value: FilterType) => setActiveFilter(value || 'all')}
-              className="justify-start"
-            >
-              <ToggleGroupItem value="all" aria-label="Show all predictions">
-                All
-              </ToggleGroupItem>
-              {user && (
-                <ToggleGroupItem value="mine" aria-label="Show my predictions">
-                  Mine
-                </ToggleGroupItem>
-              )}
-              <ToggleGroupItem value="awaiting" aria-label="Show predictions awaiting results">
-                Awaiting
-              </ToggleGroupItem>
-              <ToggleGroupItem value="correct" aria-label="Show correct predictions">
-                Correct
-              </ToggleGroupItem>
-              <ToggleGroupItem value="incorrect" aria-label="Show incorrect predictions">
-                Incorrect
-              </ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc')}
-          >
-            <ArrowUpDown className="h-4 w-4 mr-2" />
-            {sortDirection === 'desc' ? 'Newest First' : 'Oldest First'}
+    <div className="space-y-4">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold">Predictions</h2>
+        {user ? (
+          <Button onClick={() => setIsAddingPrediction(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Prediction
           </Button>
+        ) : (
+          <Button onClick={() => setIsLoginOpen(true)}>
+            Sign in to add predictions
+          </Button>
+        )}
+      </div>
+
+      <div className="flex justify-between items-center gap-4">
+        <div className="block sm:hidden w-48">
+          <Select
+            value={activeFilter}
+            onValueChange={(value: FilterType) => setActiveFilter(value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              {user && <SelectItem value="mine">Mine</SelectItem>}
+              <SelectItem value="awaiting">Awaiting</SelectItem>
+              <SelectItem value="correct">Correct</SelectItem>
+              <SelectItem value="incorrect">Incorrect</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        {getFilteredPredictions().length === 0 ? (
-          <Card className="p-8 text-center">
-            <p className="text-gray-500">
-              {activeFilter === 'all' 
-                ? 'No predictions yet. Be the first to add one!'
-                : 'No predictions match the selected filter.'}
-            </p>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {getFilteredPredictions().map((prediction) => (
-              <Card 
-                key={prediction.id} 
-                className={cn(
-                  "p-4 rounded-lg border", 
-                  {
-                    "bg-green-100 dark:bg-green-950": prediction.is_correct === true,
-                    "bg-red-100 dark:bg-red-950": prediction.is_correct === false,
-                  }
-                )}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="space-y-2">
-                    <p className="text-lg">{prediction.content}</p>
-                    {prediction.result_text && (
-                      <div className="mt-4 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Result:</span>
-                          {prediction.is_correct ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">{prediction.result_text}</p>
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      <span>{prediction.user?.user_metadata?.display_name || 'Anonymous'}</span>
-                      <span>•</span>
-                      <span>{new Date(prediction.created_at).toLocaleDateString()}</span>
-                      {prediction.is_locked && (
-                        <>
-                          <span>•</span>
-                          <Lock className="h-4 w-4" />
-                          <span>Locked</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {user?.id === prediction.user_id && !prediction.is_locked && (
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setEditingPrediction(prediction)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeletingPrediction(prediction)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleLock(prediction)}
-                      >
-                        <Lock className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                  {user?.id === prediction.user_id && prediction.is_locked && !prediction.result_text && (
-                    <Button
-                      variant="outline"
-                      onClick={() => setAddingResultTo(prediction)}
-                    >
-                      Add Result
-                    </Button>
-                  )}
-                  {user && user.id !== prediction.user_id && prediction.result_text === null && (
-                    <div className="mt-auto">
-                      <div className="flex flex-col gap-2">
-                        <Button
-                          size="sm"
-                          variant={votes[prediction.id]?.type === 'agree' ? 'default' : 'outline'}
-                          onClick={() => handleVote(prediction.id, 'agree')}
-                          className="w-full"
-                        >
-                          <ThumbsUp className="w-4 h-4 mr-1" />
-                          <span className="ml-1">{voteCounts[prediction.id]?.agrees || 0}</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={votes[prediction.id]?.type === 'disagree' ? 'default' : 'outline'}
-                          onClick={() => handleVote(prediction.id, 'disagree')}
-                          className="w-full"
-                        >
-                          <ThumbsDown className="w-4 h-4 mr-1" />
-                          <span className="ml-1">{voteCounts[prediction.id]?.disagrees || 0}</span>
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
+        <div className="hidden sm:block">
+          <ToggleGroup 
+            type="single" 
+            value={activeFilter}
+            onValueChange={(value: FilterType) => setActiveFilter(value || 'all')}
+            className="justify-start"
+          >
+            <ToggleGroupItem value="all" aria-label="Show all predictions">
+              All
+            </ToggleGroupItem>
+            {user && (
+              <ToggleGroupItem value="mine" aria-label="Show my predictions">
+                Mine
+              </ToggleGroupItem>
+            )}
+            <ToggleGroupItem value="awaiting" aria-label="Show predictions awaiting results">
+              Awaiting
+            </ToggleGroupItem>
+            <ToggleGroupItem value="correct" aria-label="Show correct predictions">
+              Correct
+            </ToggleGroupItem>
+            <ToggleGroupItem value="incorrect" aria-label="Show incorrect predictions">
+              Incorrect
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc')}
+        >
+          <ArrowUpDown className="h-4 w-4 mr-2" />
+          {sortDirection === 'desc' ? 'Newest First' : 'Oldest First'}
+        </Button>
+      </div>
+
+      <div className="space-y-4">
+        {getFilteredPredictions().map((prediction) => (
+          <PredictionCard
+            key={prediction.id}
+            prediction={prediction}
+            voteCounts={voteCounts[prediction.id] || { agrees: 0, disagrees: 0 }}
+            onAddResult={() => setAddingResultTo(prediction)}
+            isOwner={user?.id === prediction.user_id}
+            onVote={handleVote}
+            votes={votes}
+          />
+        ))}
       </div>
 
       <AddPredictionDialog
@@ -753,6 +657,6 @@ export function PredictionsList() {
         open={isLoginOpen}
         onOpenChange={setIsLoginOpen}
       />
-    </>
+    </div>
   )
 } 

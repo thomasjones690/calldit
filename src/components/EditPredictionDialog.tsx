@@ -13,6 +13,8 @@ import { Button } from './ui/button'
 import { Textarea } from './ui/textarea'
 import { useToast } from './ui/use-toast'
 import { Prediction } from '../types'
+import { CategorySelect } from './CategorySelect'
+import { Label } from './ui/label'
 
 interface EditPredictionDialogProps {
   open: boolean
@@ -23,6 +25,7 @@ interface EditPredictionDialogProps {
 
 export function EditPredictionDialog({ open, onOpenChange, prediction, setPredictions }: EditPredictionDialogProps) {
   const [content, setContent] = useState(prediction.content)
+  const [categoryId, setCategoryId] = useState(prediction.category_id || '')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 
@@ -40,7 +43,10 @@ export function EditPredictionDialog({ open, onOpenChange, prediction, setPredic
     try {
       const { error } = await supabase
         .from('predictions')
-        .update({ content: content.trim() })
+        .update({ 
+          content: content.trim(),
+          category_id: categoryId || null
+        })
         .eq('id', prediction.id)
 
       if (error) throw error
@@ -73,7 +79,14 @@ export function EditPredictionDialog({ open, onOpenChange, prediction, setPredic
         <DialogHeader>
           <DialogTitle>Edit Prediction</DialogTitle>
         </DialogHeader>
-        <div className="py-4">
+        <div className="py-4 grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="category">Category</Label>
+            <CategorySelect
+              value={categoryId}
+              onChange={setCategoryId}
+            />
+          </div>
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}

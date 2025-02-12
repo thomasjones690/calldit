@@ -15,7 +15,8 @@ import { Label } from './ui/label'
 import { Input } from './ui/input'
 import { Button } from './ui/button'
 import { useToast } from './ui/use-toast'
-import { LogOut } from 'lucide-react'
+import { LogOut, Moon, Sun, Crown } from 'lucide-react'
+import { useTheme } from 'next-themes'
 
 interface UserSettingsDialogProps {
   open?: boolean
@@ -27,6 +28,7 @@ interface Profile {
   display_name: string
   total_points: number
   total_correct: number
+  theme: 'light' | 'dark' | 'system'
   // ... other profile fields
 }
 
@@ -36,6 +38,8 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
   const [displayName, setDisplayName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const { theme, setTheme } = useTheme()
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     if (open && user) {
@@ -54,12 +58,31 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
         if (data) {
           setProfile(data)
           setDisplayName(data.display_name || '')
+          if (data.theme) {
+            setTheme(data.theme)
+          }
         }
       }
 
       fetchProfile()
     }
-  }, [open, user])
+  }, [open, user, setTheme])
+
+  useEffect(() => {
+    if (user) {
+      const checkAdminStatus = async () => {
+        const { data } = await supabase
+          .from('admins')
+          .select('user_id')
+          .eq('user_id', user.id)
+          .single()
+        
+        setIsAdmin(!!data)
+      }
+      
+      checkAdminStatus()
+    }
+  }, [user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,6 +116,28 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
     }
   }
 
+  const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          theme: newTheme,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user?.id)
+
+      if (error) throw error
+      
+      setTheme(newTheme)
+    } catch (error: any) {
+      toast({
+        title: 'Error updating theme',
+        description: error.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut()
     if (error) {
@@ -110,7 +155,10 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
     <Dialog modal open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Profile Settings</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            User Settings
+            {isAdmin && <Crown className="h-4 w-4 text-yellow-500" />}
+          </DialogTitle>
           <DialogDescription>
             View and update your profile information.
           </DialogDescription>
@@ -168,7 +216,38 @@ export function UserSettingsDialog({ open, onOpenChange }: UserSettingsDialogPro
             </div>
           </div>
 
-          {/* Add Sign Out Button */}
+          {/* Add Theme Selection before the Sign Out button */}
+          <div className="grid gap-2">
+            <h3 className="font-semibold">Appearance</h3>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                className={`justify-start ${theme === 'light' ? 'border-primary' : ''}`}
+                onClick={() => handleThemeChange('light')}
+              >
+                <Sun className="h-4 w-4 mr-2" />
+                Light
+              </Button>
+              <Button
+                variant="outline"
+                className={`justify-start ${theme === 'dark' ? 'border-primary' : ''}`}
+                onClick={() => handleThemeChange('dark')}
+              >
+                <Moon className="h-4 w-4 mr-2" />
+                Dark
+              </Button>
+              <Button
+                variant="outline"
+                className={`justify-start ${theme === 'system' ? 'border-primary' : ''}`}
+                onClick={() => handleThemeChange('system')}
+              >
+                <span className="h-4 w-4 mr-2">💻</span>
+                System
+              </Button>
+            </div>
+          </div>
+
+          {/* Sign Out Button */}
           <div className="border-t pt-4">
             <Button 
               variant="destructive" 
