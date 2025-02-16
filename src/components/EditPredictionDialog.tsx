@@ -15,6 +15,11 @@ import { useToast } from './ui/use-toast'
 import { Prediction } from '../types'
 import { CategorySelect } from './CategorySelect'
 import { Label } from './ui/label'
+import { Calendar } from "./ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
+import { CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
 
 interface EditPredictionDialogProps {
   open: boolean
@@ -25,12 +30,22 @@ interface EditPredictionDialogProps {
 
 export function EditPredictionDialog({ open, onOpenChange, prediction, setPredictions }: EditPredictionDialogProps) {
   const [content, setContent] = useState(prediction.content)
-  const [categoryId, setCategoryId] = useState(prediction.category_id || '')
+  const [categoryId, setCategoryId] = useState(prediction.category_id)
+  const [endDate, setEndDate] = useState<Date>(() => {
+    try {
+      // Try to parse the date, fallback to current date if invalid
+      const date = prediction.end_date ? new Date(prediction.end_date) : new Date()
+      return isNaN(date.getTime()) ? new Date() : date
+    } catch (e) {
+      console.error('Error parsing date:', e)
+      return new Date()
+    }
+  })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
 
   const handleUpdate = async () => {
-    if (!content.trim()) return
+    if (!content.trim() || !endDate) return
 
     // Optimistically update the prediction
     setPredictions(prev => prev.map(p => 
@@ -45,7 +60,9 @@ export function EditPredictionDialog({ open, onOpenChange, prediction, setPredic
         .from('predictions')
         .update({ 
           content: content.trim(),
-          category_id: categoryId || null
+          category_id: categoryId,
+          end_date: endDate.toISOString(),
+          updated_at: new Date().toISOString()
         })
         .eq('id', prediction.id)
 
@@ -73,6 +90,16 @@ export function EditPredictionDialog({ open, onOpenChange, prediction, setPredic
     }
   }
 
+  // Format date for input
+  const formatDateForInput = (date: Date) => {
+    try {
+      return date.toISOString().split('.')[0]
+    } catch (e) {
+      console.error('Error formatting date:', e)
+      return new Date().toISOString().split('.')[0]
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -83,9 +110,35 @@ export function EditPredictionDialog({ open, onOpenChange, prediction, setPredic
           <div className="grid gap-2">
             <Label htmlFor="category">Category</Label>
             <CategorySelect
-              value={categoryId}
+              value={categoryId || ''}
               onChange={setCategoryId}
             />
+          </div>
+          <div className="grid gap-2">
+            <Label>End Date</Label>
+            <Popover modal={true}>
+              <PopoverTrigger>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !endDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={endDate}
+                  onSelect={(date: Date | undefined) => date && setEndDate(date)}
+                  initialFocus
+                  disabled={(date) => date < new Date()}
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           <Textarea
             value={content}

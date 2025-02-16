@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Card } from './ui/card'
 import { Button } from './ui/button'
-import { ThumbsUp, ThumbsDown, Medal, Share, MessageSquare } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Medal, Share, MessageSquare, Lock, Edit } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -11,37 +11,25 @@ import {
 import React from 'react'
 import { AVAILABLE_ICONS } from './CategoryManagement'  // Import the icons map
 import { format } from 'timeago.js'
+import { Prediction } from '../types'  // Add this import
+import { Link } from 'react-router-dom'
 
 interface PredictionCardProps {
-  prediction: {
-    id: string
-    content: string
-    user_id: string
-    is_locked: boolean
-    result_text?: string | null
-    is_correct?: boolean
-    category?: string
-    category_name: string
-    display_name?: string
-    category_icon?: string
-    categories?: {
-      id: string
-      name: string
-      icon?: string
-    }
-    locked_at?: string | null
-  }
+  prediction: Prediction
   voteCounts: {
     agrees: number
     disagrees: number
   }
   onAddResult: () => void
   isOwner: boolean
-  onVote: (predictionId: string, voteType: 'agree' | 'disagree') => void
-  votes?: Record<string, { type: 'agree' | 'disagree', id: string }>
+  onVote: (predictionId: string, voteType: 'agree' | 'disagree') => Promise<void>
+  votes: Record<string, { type: 'agree' | 'disagree', id: string }>
+  onLock: (prediction: Prediction) => Promise<void>
+  onEdit: (prediction: Prediction) => void
+  commentCount?: number
 }
 
-export function PredictionCard({ prediction, voteCounts, onAddResult, isOwner, onVote, votes }: PredictionCardProps) {
+export function PredictionCard({ prediction, voteCounts, onAddResult, isOwner, onVote, votes, onLock, onEdit, commentCount = 0 }: PredictionCardProps) {
   const getCardClassName = () => {
     if (prediction.result_text) {
       return prediction.is_correct
@@ -62,31 +50,67 @@ export function PredictionCard({ prediction, voteCounts, onAddResult, isOwner, o
         {/* Category and Actions Row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              {prediction.category && (
-                <>
-                  {prediction.categories?.icon && (
-                    <span className="w-4 h-4">
-                      {AVAILABLE_ICONS[prediction.categories.icon as keyof typeof AVAILABLE_ICONS] && 
-                        React.createElement(
-                          AVAILABLE_ICONS[prediction.categories.icon as keyof typeof AVAILABLE_ICONS], 
-                          { className: "w-4 h-4" }
-                        )
-                      }
-                    </span>
-                  )}
-                  {prediction.category}
-                </>
-              )}
-            </span>
+            {prediction.category_icon && (
+              <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <span className="w-4 h-4">
+                  {AVAILABLE_ICONS[prediction.category_icon as keyof typeof AVAILABLE_ICONS] && 
+                    React.createElement(
+                      AVAILABLE_ICONS[prediction.category_icon as keyof typeof AVAILABLE_ICONS], 
+                      { className: "w-4 h-4" }
+                    )
+                  }
+                </span>
+                {prediction.category_name}
+              </span>
+            )}
             <span className="text-sm text-muted-foreground">
-              As predicted by {isOwner ? 'Me' : prediction.display_name}
-              {prediction.locked_at && (
-                <span className="ml-1">• {format(prediction.locked_at)}</span>
+              {isOwner ? 'You' : prediction.user?.user_metadata.display_name}
+              {prediction.locked_at ? (
+                <> called it <span>{format(prediction.locked_at)} - Prediction ends {format(new Date(prediction.end_date))}</span></>
+              ) : (
+                <> called it <span>{format(prediction.created_at)}</span> but you need to lock it in!</>
               )}
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {isOwner && !prediction.is_locked && (
+              <>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onEdit?.(prediction)}
+                        className="hover:bg-muted"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Edit Prediction</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onLock?.(prediction)}
+                        className="hover:bg-muted"
+                      >
+                        <Lock className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Lock Prediction</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
+            )}
             {!prediction.result_text && (
               <TooltipProvider>
                 <Tooltip>
@@ -106,53 +130,50 @@ export function PredictionCard({ prediction, voteCounts, onAddResult, isOwner, o
                 </Tooltip>
               </TooltipProvider>
             )}
-            {/* Future features */}
-            {/*
-            <Button variant="ghost" size="icon" className="hover:bg-muted">
-              <Share className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="hover:bg-muted">
-              <MessageSquare className="h-4 w-4" />
-            </Button>
-            */}
+           
           </div>
         </div>
 
         {/* Prediction Content */}
-        <h3 className="text-lg font-medium">{prediction.content}</h3>
-
-        {/* Result if available */}
-        {prediction.result_text && (
-          <div className={`text-sm p-2 rounded-md ${
-            prediction.is_correct 
-              ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200' 
-              : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200'
-          }`}>
-            <p>Result: {prediction.result_text}</p>
-          </div>
-        )}
+        <div className="space-y-2">
+          <Link 
+            to={`/prediction/${encodeURIComponent(prediction.content.toLowerCase().replace(/\s+/g, '-'))}`} 
+            className="hover:underline"
+          >
+            <h3 className="text-lg font-semibold">{prediction.content}</h3>
+          </Link>
+          {prediction.result_text && (
+            <div className={`text-sm p-2 rounded-md ${
+              prediction.is_correct 
+                ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200' 
+                : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+            }`}>
+              <p>Result: {prediction.result_text}</p>
+            </div>
+          )}
+        </div>
 
         {/* Vote Counts */}
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {isOwner ? (
             // Plain text for owner's view
-            <>
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-1">
-                <ThumbsUp className="h-4 w-4" />
+                <ThumbsUp className="h-4 w-5" />
                 <span>{voteCounts.agrees}</span>
               </div>
               <div className="flex items-center gap-1">
-                <ThumbsDown className="h-4 w-4" />
+                <ThumbsDown className="h-4 w-5" />
                 <span>{voteCounts.disagrees}</span>
               </div>
-            </>
+            </div>
           ) : (
             // Interactive buttons for other users
             <>
               <Button
                 variant="ghost"
                 size="sm"
-                className={`flex items-center gap-1 hover:bg-muted ${
+                className={`flex items-center hover:bg-muted ${
                   votes?.[prediction.id]?.type === 'agree' ? 'text-primary' : ''
                 }`}
                 onClick={() => onVote(prediction.id, 'agree')}
@@ -175,8 +196,15 @@ export function PredictionCard({ prediction, voteCounts, onAddResult, isOwner, o
                 }`} />
                 <span>{voteCounts.disagrees}</span>
               </Button>
+            
             </>
           )}
+            <Link to={`/prediction/${encodeURIComponent(prediction.content.toLowerCase().replace(/\s+/g, '-'))}`}>
+              <Button variant="ghost" size="icon" className="hover:bg-muted gap-1">
+                <MessageSquare className="h-4 w-4" />
+                {commentCount > 0 && <span className="text-xs">{commentCount}</span>}
+              </Button>
+            </Link>
         </div>
       </div>
     </Card>

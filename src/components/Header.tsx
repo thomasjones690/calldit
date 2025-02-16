@@ -9,6 +9,7 @@ import { User } from 'lucide-react'
 import { supabase } from '../lib/supabase/client'
 import { PredictionStats } from './PredictionStats'
 import { LoginDialog } from './LoginDialog'
+import { NotificationBell } from './NotificationBell'
 
 export function Header() {
   const { user } = useAuth()
@@ -51,9 +52,15 @@ export function Header() {
     <>
       <header className="border-b">
         <div className="container mx-auto p-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold">Predictometer</h1>
+          <h1 
+            className="text-xl font-bold cursor-pointer hover:text-gray-600 transition-colors" 
+            onClick={() => navigate('/')}
+          >
+            Calldit
+          </h1>
           {user ? (
             <div className="flex items-center gap-2">
+                <NotificationBell />
               <Button 
                 variant="outline" 
                 onClick={() => setIsSettingsOpen(true)}

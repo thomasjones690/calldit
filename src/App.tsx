@@ -9,6 +9,7 @@ import { DisplayNamePrompt } from './components/DisplayNamePrompt'
 import { Helmet, HelmetProvider } from 'react-helmet-async'
 import { PredictionsList } from './components/PredictionsList'
 import { ThemeProvider } from 'next-themes'
+import { PredictionView } from './components/PredictionView'
 
 // Protected Route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -37,7 +38,7 @@ function App() {
           <Router>
             <div className="min-h-screen flex flex-col">
               <Helmet>
-                <title>Predictometer</title>
+                <title>Calldit</title>
                 <meta name="description" content="Track and verify your shitty predictions" />
                 <link rel="icon" href="/favicon.ico" />
               </Helmet>
@@ -61,6 +62,7 @@ function App() {
                       </ProtectedRoute>
                     } 
                   />
+                  <Route path="/prediction/:id" element={<PredictionView />} />
                 </Routes>
               </main>
               <DisplayNamePrompt />

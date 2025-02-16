@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog'
-import { Plus, ArrowUpDown} from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { AddPredictionDialog } from './AddPredictionDialog'
 import { AddResultDialog } from './AddResultDialog'
 import { CategorySelect } from './CategorySelect'
@@ -211,21 +211,7 @@ export function PredictionsList() {
     try {
       console.log('Fetching predictions...')
       
-      // First, let's try a simple query to test basic access
-      const testQuery = await supabase
-        .from('predictions')
-        .select('*')
-        .limit(1)
-      
-      console.log('Test query result:', testQuery)
-
-      if (testQuery.error) {
-        console.error('Test query failed:', testQuery.error)
-        throw testQuery.error
-      }
-
-      // Now try the full query with joins
-      const { data: predictions } = await supabase
+      const { data: predictions, error } = await supabase
         .from('predictions_with_profiles')
         .select(`
           id,
@@ -235,6 +221,9 @@ export function PredictionsList() {
           locked_at,
           result_text,
           is_correct,
+          created_at,
+          updated_at,
+          end_date,
           display_name,
           category_id,
           category_name,
@@ -242,24 +231,23 @@ export function PredictionsList() {
             id,
             name,
             icon
-          )
+          ),
+          comments:comments(count)
         `)
         .order('created_at', { ascending: sortDirection === 'asc' })
 
-      console.log('Full query result:', { data: predictions, error: null })
-
-      if (!predictions) {
-        throw new Error('Failed to fetch predictions')
-      }
+      if (error) throw error
 
       const transformedData = predictions?.map((prediction: any) => ({
         ...prediction,
-        category: prediction.category_name,
+        category_name: prediction.categories?.name,
+        category_icon: prediction.categories?.icon,
         user: {
           user_metadata: {
             display_name: prediction.display_name || 'Anonymous'
           }
-        }
+        },
+        commentCount: prediction.comments?.[0]?.count || 0
       }))
 
       console.log('Transformed data:', transformedData)
@@ -321,52 +309,76 @@ export function PredictionsList() {
   const handleVote = async (predictionId: string, voteType: 'agree' | 'disagree') => {
     if (!user) return
     
+    console.log('Current user:', user)
+    console.log('User ID being used:', user.id)
+    
     const existingVote = votes[predictionId]
     const previousVotes = { ...votes }
     
     try {
       if (existingVote) {
-        // Optimistically remove vote if clicking the same button
         if (existingVote.type === voteType) {
-          // Optimistically update UI
+          console.log('Deleting vote:', existingVote)
           const newVotes = { ...votes }
           delete newVotes[predictionId]
           setVotes(newVotes)
 
-          // Attempt server update
           const { error } = await supabase
             .from('prediction_votes')
             .delete()
             .eq('id', existingVote.id)
 
-          if (error) throw error
+          if (error) {
+            console.error('Delete vote error:', error)
+            throw error
+          }
+          await fetchVoteCounts()
+        } else {
+          console.log('Updating vote:', { existingVote, newType: voteType })
+          setVotes(prev => ({
+            ...prev,
+            [predictionId]: { 
+              ...prev[predictionId],
+              type: voteType 
+            }
+          }))
+
+          const { error } = await supabase
+            .from('prediction_votes')
+            .update({ vote_type: voteType })
+            .eq('id', existingVote.id)
+
+          if (error) {
+            console.error('Update vote error:', error)
+            throw error
+          }
+          await fetchVoteCounts()
         }
-        return // Don't allow changing vote type
+        return
       }
 
-      // Optimistically add new vote
-      setVotes(prev => ({
-        ...prev,
-        [predictionId]: { 
-          type: voteType, 
-          id: 'temp-id' // Temporary ID until server responds
-        }
-      }))
+      console.log('Creating new vote:', { 
+        prediction_id: predictionId, 
+        user_id: user.id,  // Check this value in console
+        vote_type: voteType 
+      })
 
-      // Attempt server update
       const { data, error } = await supabase
         .from('prediction_votes')
         .insert({
           prediction_id: predictionId,
-          user_id: user.id,
+          user_id: user.id,  // Make sure this matches the auth.uid() in the policy
           vote_type: voteType
         })
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Insert vote error:', error)
+        throw error
+      }
+      await fetchVoteCounts()
 
-      // Update with real ID from server
       setVotes(prev => ({
         ...prev,
         [predictionId]: { 
@@ -375,12 +387,17 @@ export function PredictionsList() {
         }
       }))
 
-    } catch (error) {
-      // Revert to previous state on error
+    } catch (error: any) {
+      console.error('Vote error details:', {
+        error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
       setVotes(previousVotes)
       toast({
         title: "Error",
-        description: "Failed to update vote. Please try again.",
+        description: error.message || "Failed to update vote. Please try again.",
         variant: "destructive"
       })
     }
@@ -534,39 +551,46 @@ export function PredictionsList() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold">Predictions</h2>
-        {user ? (
-          <Button onClick={() => setIsAddingPrediction(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Prediction
-          </Button>
-        ) : (
-          <Button onClick={() => setIsLoginOpen(true)}>
-            Sign in to add predictions
-          </Button>
-        )}
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4">
-        <Select value={activeFilter} onValueChange={(value: FilterType) => setActiveFilter(value)}>
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Filter predictions" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Predictions</SelectItem>
-            <SelectItem value="mine">My Predictions</SelectItem>
-            <SelectItem value="awaiting">Awaiting Result</SelectItem>
-            <SelectItem value="correct">Correct</SelectItem>
-            <SelectItem value="incorrect">Incorrect</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div className="w-full sm:w-[200px]">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Select value={activeFilter} onValueChange={(value: FilterType) => setActiveFilter(value)}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Filter predictions" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Predictions</SelectItem>
+              <SelectItem value="mine">My Predictions</SelectItem>
+              <SelectItem value="awaiting">Awaiting Result</SelectItem>
+              <SelectItem value="correct">Correct</SelectItem>
+              <SelectItem value="incorrect">Incorrect</SelectItem>
+            </SelectContent>
+          </Select>
+          
           <CategorySelect
             value={selectedCategory}
             onChange={setSelectedCategory}
           />
         </div>
+        {user ? (
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Select value={sortDirection} onValueChange={(value: SortDirection) => setSortDirection(value)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Sort by date" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">Newest first</SelectItem>
+              <SelectItem value="asc">Oldest first</SelectItem>
+            </SelectContent>
+                </Select>
+          <Button onClick={() => setIsAddingPrediction(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Prediction
+          </Button>
+          </div>
+        ) : (
+          <Button onClick={() => setIsLoginOpen(true)}>
+            Sign in to add predictions
+          </Button>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -579,6 +603,9 @@ export function PredictionsList() {
             isOwner={user?.id === prediction.user_id}
             onVote={handleVote}
             votes={votes}
+            onLock={handleLock}
+            onEdit={(prediction) => setEditingPrediction(prediction)}
+            commentCount={prediction.comments?.[0]?.count || 0}
           />
         ))}
       </div>

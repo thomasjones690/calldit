@@ -16,6 +16,11 @@ import { useAuth } from '../lib/supabase/auth-context'
 import { CategorySelect } from './CategorySelect'
 import { Label } from './ui/label'
 import { Prediction } from '@/types'  // Use absolute import
+import { Calendar } from './ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor, PopoverPortal } from './ui/popover'
+import { CalendarIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { format } from 'date-fns'
 
 interface AddPredictionDialogProps {
   open: boolean
@@ -26,6 +31,7 @@ interface AddPredictionDialogProps {
 export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddPredictionDialogProps) {
   const [content, setContent] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [endDate, setEndDate] = useState<Date>(new Date())
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
   const { user } = useAuth()
@@ -49,6 +55,7 @@ export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddP
       locked_at: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      end_date: endDate.toISOString(),
       user: {
         user_metadata: {
           display_name: profile?.display_name || 'Anonymous'
@@ -113,6 +120,38 @@ export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddP
             onChange={(e) => setContent(e.target.value)}
             className="min-h-[100px]"
           />
+          <div className="grid gap-2">
+            <Label>End Date</Label>
+            <Popover modal={true}>
+                <PopoverTrigger>
+                  <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !endDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverPortal>
+              <PopoverContent 
+                className="w-auto p-0" 
+                align="start"
+                side="bottom"
+              >
+                <Calendar
+                  mode="single"
+                  selected={endDate}
+                  onSelect={(date: Date | undefined) => date && setEndDate(date)}
+                  initialFocus
+                  disabled={(date) => date < new Date()}
+                />
+              </PopoverContent>
+              </PopoverPortal>
+            </Popover>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
