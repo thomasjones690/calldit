@@ -76,6 +76,7 @@ export function AddPredictionDialog({ open, onOpenChange, setPredictions }: AddP
           content: content.trim(),
           user_id: user.id,
           category_id: categoryId || null,
+          end_date: endDate.toISOString()
         }])
         .select()
 
