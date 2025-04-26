@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronDown, Filter as FilterIcon } from 'lucide-react'
 import { AddPredictionDialog } from './AddPredictionDialog'
 import { AddResultDialog } from './AddResultDialog'
 import { CategorySelect } from './CategorySelect'
@@ -50,6 +50,7 @@ export function PredictionsList() {
   const [voteCounts, setVoteCounts] = useState<VoteCounts>({})
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [categories, setCategories] = useState<any[]>([])
+  const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
     if (!user && activeFilter === 'mine') {
@@ -550,47 +551,106 @@ export function PredictionsList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Select value={activeFilter} onValueChange={(value: FilterType) => setActiveFilter(value)}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Filter predictions" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Predictions</SelectItem>
-              <SelectItem value="mine">My Predictions</SelectItem>
-              <SelectItem value="awaiting">Awaiting Result</SelectItem>
-              <SelectItem value="correct">Correct</SelectItem>
-              <SelectItem value="incorrect">Incorrect</SelectItem>
-            </SelectContent>
-          </Select>
+      <div className="space-y-4 mb-6">
+        {/* Mobile view - collapsed filters */}
+        <div className="flex justify-between items-center md:hidden">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-2"
+          >
+            <FilterIcon className="h-4 w-4" />
+            Filters
+            <ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          </Button>
           
-          <CategorySelect
-            value={selectedCategory}
-            onChange={setSelectedCategory}
-          />
+          {user ? (
+            <Button onClick={() => setIsAddingPrediction(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add
+            </Button>
+          ) : (
+            <Button onClick={() => setIsLoginOpen(true)}>Sign in</Button>
+          )}
         </div>
-        {user ? (
-          <div className="flex flex-col sm:flex-row gap-4">
+        
+        {/* Mobile expandable filters */}
+        {showFilters && (
+          <div className="flex flex-col gap-3 p-3 border rounded-md md:hidden">
+            <Select value={activeFilter} onValueChange={(value: FilterType) => setActiveFilter(value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Filter predictions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Predictions</SelectItem>
+                <SelectItem value="mine">My Predictions</SelectItem>
+                <SelectItem value="awaiting">Awaiting Result</SelectItem>
+                <SelectItem value="correct">Correct</SelectItem>
+                <SelectItem value="incorrect">Incorrect</SelectItem>
+              </SelectContent>
+            </Select>
+            
             <Select value={sortDirection} onValueChange={(value: SortDirection) => setSortDirection(value)}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sort by date" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="desc">Newest first</SelectItem>
-              <SelectItem value="asc">Oldest first</SelectItem>
-            </SelectContent>
-                </Select>
-          <Button onClick={() => setIsAddingPrediction(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Prediction
-          </Button>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc">Newest first</SelectItem>
+                <SelectItem value="asc">Oldest first</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <CategorySelect
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+              className="w-full"
+            />
           </div>
-        ) : (
-          <Button onClick={() => setIsLoginOpen(true)}>
-            Sign in to add predictions
-          </Button>
         )}
+        
+        {/* Desktop view - always visible filters */}
+        <div className="hidden md:flex md:justify-between md:items-center">
+          <div className="flex flex-row gap-4">
+            <Select value={activeFilter} onValueChange={(value: FilterType) => setActiveFilter(value)}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter predictions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Predictions</SelectItem>
+                <SelectItem value="mine">My Predictions</SelectItem>
+                <SelectItem value="awaiting">Awaiting Result</SelectItem>
+                <SelectItem value="correct">Correct</SelectItem>
+                <SelectItem value="incorrect">Incorrect</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <CategorySelect
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+            />
+          </div>
+          {user ? (
+            <div className="flex flex-row gap-4">
+              <Select value={sortDirection} onValueChange={(value: SortDirection) => setSortDirection(value)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Sort by date" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Newest first</SelectItem>
+                  <SelectItem value="asc">Oldest first</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={() => setIsAddingPrediction(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Prediction
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={() => setIsLoginOpen(true)}>
+              Sign in to add predictions
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-4">

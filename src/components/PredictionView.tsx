@@ -37,26 +37,59 @@ export function PredictionView() {
 
   const fetchPrediction = async () => {
     if (!encodedContent) return
-
-    const decodedContent = decodeURIComponent(encodedContent)
     
-    const { data, error } = await supabase
-      .from('predictions_with_profiles')
-      .select('*')
-      .ilike('content', decodedContent.replace(/-/g, ' '))
-      .single()
-
-    if (error) {
+    try {
+      const decodedContent = decodeURIComponent(encodedContent)
+      
+      // First try to get the prediction by exact ID if it's a UUID
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decodedContent)) {
+        const { data, error } = await supabase
+          .from('predictions_with_profiles')
+          .select('*')
+          .eq('id', decodedContent)
+          .single()
+        
+        if (!error && data) {
+          setPrediction(data)
+          fetchComments(data.id)
+          return
+        }
+      }
+      
+      // Fall back to content search, but get the most recent match instead of using .single()
+      const { data, error } = await supabase
+        .from('predictions_with_profiles')
+        .select('*')
+        .ilike('content', decodedContent.replace(/-/g, ' '))
+        .order('created_at', { ascending: false })
+        .limit(1)
+      
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error.message,
+          variant: 'destructive',
+        })
+        return
+      }
+      
+      if (data && data.length > 0) {
+        setPrediction(data[0])
+        fetchComments(data[0].id)
+      } else {
+        toast({
+          title: 'Prediction not found',
+          description: 'The prediction you are looking for could not be found.',
+          variant: 'destructive',
+        })
+      }
+    } catch (error: any) {
       toast({
         title: 'Error',
         description: error.message,
         variant: 'destructive',
       })
-      return
     }
-
-    setPrediction(data)
-    fetchComments(data.id)
   }
 
   const fetchComments = async (predictionId: string) => {

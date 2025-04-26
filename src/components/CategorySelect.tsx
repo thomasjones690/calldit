@@ -17,13 +17,15 @@ import { Label } from './ui/label'
 import { components } from 'react-select'
 import { toast } from './ui/use-toast'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { cn } from '@/lib/utils'
 
 interface CategorySelectProps {
   value: string
   onChange: (value: string) => void
+  className?: string
 }
 
-export function CategorySelect({ value, onChange }: CategorySelectProps) {
+export function CategorySelect({ value, onChange, className }: CategorySelectProps) {
   const [categories, setCategories] = useState<any[]>([])
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -176,6 +178,7 @@ export function CategorySelect({ value, onChange }: CategorySelectProps) {
         }}
         isClearable
         placeholder="Select or create a category..."
+        className={cn("w-[300px]", className)}
       />
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
